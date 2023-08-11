@@ -83,6 +83,11 @@ void check_consecutive_eq(data_t *ptr_items, int *destination) {
     destination[i] = (ptr_items[i] == ptr_items[i+1]);
 }
 
+class range_too_large_error : public std::runtime_error {
+    public:
+    range_too_large_error() : std::runtime_error("total_deposit_size > MAX_BATCH_SIZE") { }
+};
+
 int check_range(data_t L, data_t H, FunctionCallLogger<9, int>& fcl) {
     fcl.time_tick();
     thrust::fill(lowerbound_args.begin(), lowerbound_args.end(), L);
@@ -102,7 +107,8 @@ int check_range(data_t L, data_t H, FunctionCallLogger<9, int>& fcl) {
     fcl.time_tick();
     int total_deposit_size = thrust::reduce(deposit_sizes.begin(), deposit_sizes.end());
     if(total_deposit_size > MAX_BATCH_SIZE) {
-        throw std::runtime_error("total_deposit_size > MAX_BATCH_SIZE");
+        fcl.cleanup();
+        throw range_too_large_error();
     }
     thrust::exclusive_scan(deposit_sizes.begin(), deposit_sizes.end(), deposit_sizes.begin());
     fcl.time_tick();
