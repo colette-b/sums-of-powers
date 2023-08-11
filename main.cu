@@ -21,8 +21,8 @@ int main() {
     while(true) {
         try {
             int batch_size = check_range(L, L + jump, fcl);
-            if(batch_size < (30LL << 20)) {
-                jump *= 2;
+            if(batch_size < (35LL << 20)) {
+                jump *= 1.05;
             }
             L += jump;
         } catch (range_too_large_error& e) {
