@@ -14,7 +14,7 @@
 #include "logging.cc"
 
 constexpr int N = 7 * 1024;
-constexpr int E = 8;
+constexpr int E = 7;
 constexpr int K = N * (N + 1) / 2;
 constexpr int MAX_BATCH_SIZE = 50 << 20;
 constexpr int GPU_BLOCK_SIZE = 256;
@@ -138,11 +138,9 @@ int check_range(data_t L, data_t H, FunctionCallLogger<9, int> fcl) {
     }
     fcl.time_tick();
     fcl.set<0>(total_deposit_size);
-    std::cout << "total_deposit_size=" << total_deposit_size
-              << ", collision happened=" << collision_happened << "\n";
     if(collision_happened) {
-        for(auto item : collisions) {
-            std::cout << (long long)(item) << " ";
+        for(int i = 0; i < collision_happened; i++) {
+            std::cout << collisions[i] << " ";
         }
         std::cout << "\n";
     }
