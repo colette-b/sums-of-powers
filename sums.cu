@@ -83,7 +83,7 @@ void check_consecutive_eq(data_t *ptr_items, int *destination) {
     destination[i] = (ptr_items[i] == ptr_items[i+1]);
 }
 
-int check_range(data_t L, data_t H, FunctionCallLogger<9, int> fcl) {
+int check_range(data_t L, data_t H, FunctionCallLogger<9, int>& fcl) {
     fcl.time_tick();
     thrust::fill(lowerbound_args.begin(), lowerbound_args.end(), L);
     fcl.time_tick();
