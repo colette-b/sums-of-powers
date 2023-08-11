@@ -34,9 +34,11 @@ std::ostream& operator<<(std::ostream& os, data_t x) {
         os << -x;
         return os;
     }
+    std::string decimal;
     while(x > 0) {
-        os << char(x%10 + '0');
+        decimal = char(x%10 + '0') + decimal;
         x /= 10;
     }
+    os << decimal;
     return os;
 }
