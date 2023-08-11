@@ -1,4 +1,3 @@
-#include <chrono>
 #include <random>
 #include <limits>
 
@@ -12,9 +11,7 @@
 #include <thrust/binary_search.h>
 
 #include "basic.cu"
-
-using ::std::chrono::system_clock;
-using ::std::chrono::time_point;
+#include "logging.cc"
 
 constexpr int N = 7 * 1024;
 constexpr int E = 8;
@@ -86,14 +83,14 @@ void check_consecutive_eq(data_t *ptr_items, int *destination) {
     destination[i] = (ptr_items[i] == ptr_items[i+1]);
 }
 
-int check_range(data_t L, data_t H) {
-    const time_point<system_clock> t1 = system_clock::now();
+int check_range(data_t L, data_t H, FunctionCallLogger<9, int> fcl) {
+    fcl.time_tick();
     thrust::fill(lowerbound_args.begin(), lowerbound_args.end(), L);
-    const time_point<system_clock> t2 = system_clock::now();
+    fcl.time_tick();
     thrust::transform(lowerbound_args.begin(), lowerbound_args.end(), sums2.begin(), lowerbound_args.begin(), thrust::minus<data_t>());
-    const time_point<system_clock> t3 = system_clock::now();
+    fcl.time_tick();
     thrust::lower_bound(sums2.begin(), sums2.end(), lowerbound_args.begin(), lowerbound_args.end(), lowerbounds.begin());
-    const time_point<system_clock> t4 = system_clock::now();
+    fcl.time_tick();
     precount<<<K/GPU_BLOCK_SIZE, GPU_BLOCK_SIZE>>>(
         H,
         thrust::raw_pointer_cast(sums2.data()),
@@ -102,13 +99,13 @@ int check_range(data_t L, data_t H) {
         thrust::raw_pointer_cast(deposit_sizes.data())
     );
     cudaDeviceSynchronize();
-    const time_point<system_clock> t5 = system_clock::now();
+    fcl.time_tick();
     int total_deposit_size = thrust::reduce(deposit_sizes.begin(), deposit_sizes.end());
     if(total_deposit_size > MAX_BATCH_SIZE) {
         throw std::runtime_error("total_deposit_size > MAX_BATCH_SIZE");
     }
     thrust::exclusive_scan(deposit_sizes.begin(), deposit_sizes.end(), deposit_sizes.begin());
-    const time_point<system_clock> t6 = system_clock::now();
+    fcl.time_tick();
     deposit<<<K/GPU_BLOCK_SIZE, GPU_BLOCK_SIZE>>>(
         H,
         thrust::raw_pointer_cast(sums2.data()),
@@ -118,10 +115,10 @@ int check_range(data_t L, data_t H) {
         thrust::raw_pointer_cast(items.data())
     );
     cudaDeviceSynchronize();
-    const time_point<system_clock> t7 = system_clock::now();
+    fcl.time_tick();
     thrust::sort(items.begin(), items.begin() + total_deposit_size);
 
-    const time_point<system_clock> t8 = system_clock::now();
+    fcl.time_tick();
     check_consecutive_eq<<<(total_deposit_size + GPU_BLOCK_SIZE - 1)/GPU_BLOCK_SIZE, GPU_BLOCK_SIZE>>>(
         thrust::raw_pointer_cast(items.data()),
         thrust::raw_pointer_cast(eq_check.data())
@@ -139,8 +136,8 @@ int check_range(data_t L, data_t H) {
         );
         collisions = collisions_collected;
     }
-    const time_point<system_clock> t9 = system_clock::now();
-
+    fcl.time_tick();
+    fcl.set<0>(total_deposit_size);
     std::cout << "total_deposit_size=" << total_deposit_size
               << ", collision happened=" << collision_happened << "\n";
     if(collision_happened) {
@@ -149,6 +146,7 @@ int check_range(data_t L, data_t H) {
         }
         std::cout << "\n";
     }
+    /*
     std::cout << "fill:               " << (t2 - t1) / std::chrono::milliseconds(1) << "ms\n";
     std::cout << "transform:          " << (t3 - t2) / std::chrono::milliseconds(1) << "ms\n";
     std::cout << "lowerbound:         " << (t4 - t3) / std::chrono::milliseconds(1) << "ms\n";
@@ -157,9 +155,11 @@ int check_range(data_t L, data_t H) {
     std::cout << "deposit:            " << (t7 - t6) / std::chrono::milliseconds(1) << "ms\n";
     std::cout << "sort:               " << (t8 - t7) / std::chrono::milliseconds(1) << "ms\n";
     std::cout << "check eq:           " << (t9 - t8) / std::chrono::milliseconds(1) << "ms\n";
+    */
     return total_deposit_size;
 }
 
+/*
 int main() {
     initialize_sums2();
     for(int run = 0; run < 1; run++) {
@@ -178,3 +178,4 @@ int main() {
     int total_check = check_range(1, 1LL<<40);
     assert(total == total_check);
 }
+*/

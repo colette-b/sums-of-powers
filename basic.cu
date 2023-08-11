@@ -29,16 +29,14 @@ std::ostream& operator<<(std::ostream& os, data_t x) {
         os << "0";
 		return os;
     }
-    if(x > 0) {
-        while(x > 0) {
-            os << char(x%10 + '0');
-            x /= 10;
-        }
-        return os;
-    }
     if(x < 0) {
         os << "-";
         os << -x;
         return os;
     }
+    while(x > 0) {
+        os << char(x%10 + '0');
+        x /= 10;
+    }
+    return os;
 }
