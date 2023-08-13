@@ -1,9 +1,7 @@
 #include<iostream>
 
-using data_t = __int128_t;
-
 __host__ __device__ 
-data_t mypow(__int128_t x, __int128_t exponent) {
+__int128_t mypow(__int128_t x, __int128_t exponent) {
     __int128_t result = x;
     for(int i = 0; i < exponent - 1; i++) {
         result *= x;
@@ -24,7 +22,7 @@ std::ostream& operator<<(std::ostream& os, const Pair& p) {
     return os;
 }
 
-std::ostream& operator<<(std::ostream& os, data_t x) {
+std::ostream& operator<<(std::ostream& os, __int128_t x) {
 	if(x == 0) {
         os << "0";
 		return os;

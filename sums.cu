@@ -13,6 +13,8 @@
 #include "basic.cu"
 #include "logging.cc"
 
+using data_t = __int128_t;
+
 constexpr int N = 7 * 1024;
 constexpr int E = 7;
 constexpr int K = N * (N + 1) / 2;
