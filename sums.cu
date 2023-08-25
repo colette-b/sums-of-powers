@@ -19,7 +19,6 @@ constexpr int N = 7 * 1024;
 constexpr int E = 7;
 constexpr int K = N * (N + 1) / 2;
 constexpr int MAX_BATCH_SIZE = 50 << 20;
-constexpr int GPU_BLOCK_SIZE = 256;
 constexpr int MAX_EXPECTED_COLLISIONS = 1 << 10;   // we expect that more collisions won't happen in one segment
 static_assert(K % GPU_BLOCK_SIZE == 0);
 
