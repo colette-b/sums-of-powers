@@ -22,7 +22,7 @@ std::ostream& operator<<(std::ostream& os, std::tuple<Ts...> const& theTuple) {
     return os;
 }
 
-template<int timepoints_count, typename... outputs>
+template<int timepoints_count, bool loud, typename... outputs>
 struct FunctionCallLogger {
     std::vector<std::array<duration, timepoints_count - 1>> timings;
     std::vector<std::tuple<outputs...>> outs;
@@ -33,11 +33,15 @@ struct FunctionCallLogger {
     FunctionCallLogger() : outs(1) { }
 
     void time_tick() {
+        if constexpr(loud) {
+            std::cerr << "tick" << current_time_point << std::endl;
+        }
         current_time_points[current_time_point++] = system_clock::now();
         check_if_completed_and_cleanup();
     }
 
-    template<int index> void set(typename std::tuple_element<index, std::tuple<outputs...>>::type item) {
+    template<int index> 
+    void set(typename std::tuple_element<index, std::tuple<outputs...>>::type item) {
         std::get<index>(outs[outs.size() - 1]) = item;
         current_item_count++;
         check_if_completed_and_cleanup();
@@ -65,13 +69,41 @@ struct FunctionCallLogger {
     }
 
     void _show(std::string end) {
-        std::cout << "id=" << last() << "\t";
+        std::cerr << "id=" << last() << "\t";
         for(duration d : timings[last()])
-            std::cout << std::chrono::duration_cast<std::chrono::milliseconds>(d).count() << "\t";
-        std::cout << outs[last()] << end;
+            std::cerr << std::chrono::duration_cast<std::chrono::milliseconds>(d).count() << "\t";
+        std::cerr << outs[last()] << end;
     }
 
     virtual void show() {
         _show("\n");
     }
 };
+
+struct SpecializedLogger : FunctionCallLogger<9, false, int> {
+    using super_t = FunctionCallLogger<9, false, int>;
+    long long total_seen = 0;
+
+    void show() override {
+        FunctionCallLogger::_show("");
+        duration total = std::accumulate(timings[last()].begin(), timings[last()].end(), duration(0));
+        std::cerr << "\tspeed=" << std::get<0>(outs[last()]) / std::chrono::duration_cast<std::chrono::duration<double, std::milli>>(total).count() / 1000 << "M/s\n";
+        total_seen += std::get<0>(outs[last()]);
+    }
+};
+
+template<typename T>
+void print_device_vector(thrust::device_vector<T>& d_vec) {
+    cudaDeviceSynchronize();
+    std::cerr << "!!!";
+    thrust::host_vector<T> h_vec = d_vec;
+    std::cerr << "!!!";
+    for(int i = 0; i < std::min(size_t(10), h_vec.size()); i++) {
+        std::cerr << h_vec[i] << " ";
+    }
+    std::cerr << "...";
+    for(int i = h_vec.size() - 10; i < h_vec.size(); i++) {
+        std::cerr << h_vec[i] << " ";
+    }
+    std::cerr << "(" << h_vec.size() << ")\n";
+}
