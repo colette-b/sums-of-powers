@@ -4,3 +4,6 @@
 !basic.cu
 !main.cu
 !logging.cc
+!sortedsums.cu
+!main_422.cu
+!main_n44.cu
