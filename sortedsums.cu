@@ -123,8 +123,8 @@ class SortedSums {
 
     }
 
-    template<typename Logger>
-    int check_range(data_t L, data_t H, Logger& fcl) {
+    //template<typename Logger>
+    int check_range(data_t L, data_t H, SpecializedLogger& fcl) {
         fcl.time_tick();
         thrust::fill(lowerbound_args.begin(), lowerbound_args.end(), L);
         gpuErrchk(cudaPeekAtLastError()); gpuErrchk(cudaDeviceSynchronize());
@@ -179,8 +179,7 @@ class SortedSums {
             collisions = collisions_collected;
         }
         fcl.time_tick();
-        //fcl.set<0>(total_deposit_size);
-        fcl.FunctionCallLogger<9, false, int>::set<0>(total_deposit_size);
+        fcl.set<0>(total_deposit_size);
         if(collision_happened) {
             for(int i = 0; i < collision_happened; i++) {
                 std::cout << collisions[i] << "\n";
