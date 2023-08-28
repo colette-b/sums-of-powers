@@ -67,6 +67,31 @@ void check_consecutive_eq(bool_t *raw_eq_check, data_t *raw_items) {
 }
 
 template<typename data_t, typename Aparam_t, typename Bparam_t, typename Condition>
+std::vector<std::pair<data_t, data_t>> restore(thrust::host_vector<data_t> A, thrust::host_vector<data_t> B, 
+                                        thrust::host_vector<Aparam_t> Aparam, thrust::host_vector<Bparam_t> Bparam, data_t collision) {
+    int l = 0, r = B.size() - 1;
+    std::vector<std::pair<data_t, data_t>> values;
+    while(l < A.size() and r >= 0) {
+        if(A[l] + B[r] < collision) {
+            l++;
+            continue;
+        }
+        if(A[l] + B[r] > collision) {
+            r--;
+            continue;
+        }
+        if(A[l] + B[r] == collision) {
+            if(Condition::condition(Aparam[l], Bparam[r])) {
+                values.push_back(std::make_pair(A[l], B[r]));
+            }
+            l++;
+            r--;
+        }
+    }
+    return values;
+}
+
+template<typename data_t, typename Aparam_t, typename Bparam_t, typename Condition>
 class SortedSums {
     thrust::device_vector<data_t> A, B;
     thrust::device_vector<Aparam_t> A_param;
@@ -193,10 +218,14 @@ class SortedSums {
     size_t check_large_range(data_t L, data_t H, Logger& fcl) {
         data_t current_L = L, jump = 1 << 20;
         size_t total = 0;
-        while(current_L < H) {
+        for(int iter = 0; current_L < H; iter++){
             try {
                 data_t current_H = std::min(current_L + jump, H);
                 int batch_size = check_range(current_L, current_H, fcl);
+                if(iter % 100 == 99) {
+                    std::cerr << "[" << current_L << ", " << current_H << ")\t";
+                    fcl.show();
+                }
                 if(batch_size < 0.1 * MAX_BATCH_SIZE) {
                     jump *= 2;
                 }
