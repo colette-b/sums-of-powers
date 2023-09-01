@@ -101,18 +101,13 @@ std::vector<std::pair<data_t, data_t>> restore(thrust::host_vector<data_t> A, th
 
 template<typename data_t, typename Aparam_t, typename Bparam_t, typename Condition>
 class SortedSums {
+    int A_size, B_size;
+    int MAX_BATCH_SIZE, MAX_EXPECTED_COLLISIONS;
     thrust::device_vector<data_t> A, B;
+    thrust::device_vector<data_t> items, lowerbound_args, collisions_collected;
     thrust::device_vector<Aparam_t> A_param;
     thrust::device_vector<Bparam_t> B_param;
-    int A_size, B_size;
-    int MAX_BATCH_SIZE;
-    int MAX_EXPECTED_COLLISIONS;
-    thrust::device_vector<int> prefix_sums;
-    thrust::device_vector<data_t> items;
-    thrust::device_vector<data_t> lowerbound_args;
-    thrust::device_vector<int> lowerbounds;
-    thrust::device_vector<int> eq_check;
-    thrust::device_vector<data_t> collisions_collected;
+    thrust::device_vector<int> prefix_sums, lowerbounds, eq_check;
 
     public:
     SortedSums(
