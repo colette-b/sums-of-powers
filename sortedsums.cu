@@ -126,8 +126,7 @@ class SortedSums {
         lowerbounds(A_size),
         items(MAX_BATCH_SIZE + 1),
         eq_check(MAX_BATCH_SIZE),
-        collisions_collected(MAX_EXPECTED_COLLISIONS),
-        raw_eq_check(thrust::raw_pointer_cast(eq_check.data()))
+        collisions_collected(MAX_EXPECTED_COLLISIONS)
     {
         A = hA;
         B = hB;
