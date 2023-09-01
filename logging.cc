@@ -27,8 +27,8 @@ struct FunctionCallLogger {
     std::vector<std::array<duration, timepoints_count - 1>> timings;
     std::vector<std::tuple<outputs...>> outs;
     std::array<time_point, timepoints_count> current_time_points;
-    int current_item_count = 0;
-    int current_time_point = 0;
+    uint current_item_count = 0;
+    uint current_time_point = 0;
 
     FunctionCallLogger() : outs(1) { }
 
