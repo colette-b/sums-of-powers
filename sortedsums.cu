@@ -17,6 +17,7 @@
  *  A, B are two arrays (of int-like type),
  *  A_param, B_param are two arrays (of any types T, S),
  *  interval [L, H),
+ *  some bool function condition(T t, S s),
  *  output:
  *  all collisions in the interval, where we iterate over all
  *  sums A[i] + B[j] such that condition(A_param[i], B_param[j]) holds.
@@ -27,33 +28,40 @@ class range_too_large_error : public std::runtime_error {
     range_too_large_error() : std::runtime_error("total_deposit_size > MAX_BATCH_SIZE") { }
 };
 
+template<typename data_t, typename Aparam_t, typename Bparam_t>
+struct SortedSumsPointers {
+    size_t A_size, B_size;
+    data_t *A, *B, *items;
+    Aparam_t *A_param;
+    Bparam_t *B_param;
+    int *lowerbounds, *prefix_sums;
+};
+
 template<typename data_t, typename Aparam_t, typename Bparam_t, typename Condition>
 __global__
-void precount(data_t H, size_t A_size, size_t B_size, data_t *raw_A, data_t *raw_B, int *raw_lowerbounds, 
-                Aparam_t *raw_A_param, Bparam_t *raw_B_param, int *raw_prefix_sums) {
+void precount(data_t H, SortedSumsPointers<data_t, Aparam_t, Bparam_t> ssp) {
     int count = 0;
     int i = blockIdx.x*blockDim.x + threadIdx.x;
-    if(i >= A_size)
+    if(i >= ssp.A_size)
         return;
-    for(int j = raw_lowerbounds[i]; j < B_size && raw_A[i] + raw_B[j] < H; j++) {
-        if(Condition::condition(raw_A_param[i], raw_B_param[j])) {
+    for(int j = ssp.lowerbounds[i]; j < ssp.B_size && ssp.A[i] + ssp.B[j] < H; j++) {
+        if(Condition::condition(ssp.A_param[i], ssp.B_param[j])) {
             count++;
         }
     }
-    raw_prefix_sums[i] = count;
+    ssp.prefix_sums[i] = count;
 }
 
 template<typename data_t, typename Aparam_t, typename Bparam_t, typename Condition>
 __global__
-void deposit(data_t H, size_t A_size, size_t B_size, data_t *raw_A, data_t *raw_B, int *raw_lowerbounds, 
-             Aparam_t *raw_A_param, Bparam_t *raw_B_param, int *raw_prefix_sums, data_t *raw_items) {
+void deposit(data_t H, SortedSumsPointers<data_t, Aparam_t, Bparam_t> ssp) {
     int i = blockIdx.x*blockDim.x + threadIdx.x;
-    if(i >= A_size)
+    if(i >= ssp.A_size)
         return;
-    int count = raw_prefix_sums[i];
-    for(int j = raw_lowerbounds[i]; j < B_size and raw_A[i] + raw_B[j] < H; j++) {
-        if(Condition::condition(raw_A_param[i], raw_B_param[j])) {
-            raw_items[count] = raw_A[i] + raw_B[j];
+    int count = ssp.prefix_sums[i];
+    for(int j = ssp.lowerbounds[i]; j < ssp.B_size and ssp.A[i] + ssp.B[j] < H; j++) {
+        if(Condition::condition(ssp.A_param[i], ssp.B_param[j])) {
+            ssp.items[count] = ssp.A[i] + ssp.B[j];
             count++;
         }
     }
@@ -105,13 +113,6 @@ class SortedSums {
     thrust::device_vector<int> lowerbounds;
     thrust::device_vector<int> eq_check;
     thrust::device_vector<data_t> collisions_collected;
-    // raw pointers 
-    data_t *raw_A, *raw_B, *raw_lowerbound_args, *raw_items;
-    Aparam_t *raw_A_param;
-    Bparam_t *raw_B_param;
-    int *raw_lowerbounds;
-    int *raw_prefix_sums;
-    int *raw_eq_check;
 
     public:
     SortedSums(
@@ -131,21 +132,26 @@ class SortedSums {
         items(MAX_BATCH_SIZE + 1),
         eq_check(MAX_BATCH_SIZE),
         collisions_collected(MAX_EXPECTED_COLLISIONS),
-        raw_lowerbound_args(thrust::raw_pointer_cast(lowerbound_args.data())),
-        raw_lowerbounds(thrust::raw_pointer_cast(lowerbounds.data())),
-        raw_prefix_sums(thrust::raw_pointer_cast(prefix_sums.data())),
-        raw_items(thrust::raw_pointer_cast(items.data())),
         raw_eq_check(thrust::raw_pointer_cast(eq_check.data()))
     {
         A = hA;
         B = hB;
         A_param = hA_param;
         B_param = hB_param;
-        raw_A = thrust::raw_pointer_cast(A.data());
-        raw_B = thrust::raw_pointer_cast(B.data());
-        raw_A_param = thrust::raw_pointer_cast(A_param.data());
-        raw_B_param = thrust::raw_pointer_cast(B_param.data());
+    }
 
+    SortedSumsPointers<data_t, Aparam_t, Bparam_t> get_ssp() {
+        SortedSumsPointers<data_t, Aparam_t, Bparam_t> ssp;
+        ssp.A = thrust::raw_pointer_cast(A.data());
+        ssp.B = thrust::raw_pointer_cast(B.data());
+        ssp.A_param = thrust::raw_pointer_cast(A_param.data());
+        ssp.B_param = thrust::raw_pointer_cast(B_param.data());
+        ssp.items = thrust::raw_pointer_cast(items.data());
+        ssp.A_size = A.size();
+        ssp.B_size = B.size();
+        ssp.lowerbounds = thrust::raw_pointer_cast(lowerbounds.data());
+        ssp.prefix_sums = thrust::raw_pointer_cast(prefix_sums.data());
+        return ssp;
     }
 
     //template<typename Logger>
@@ -162,9 +168,7 @@ class SortedSums {
         fcl.time_tick();
         precount<data_t, Aparam_t, Bparam_t, Condition>
                 <<<1 + A_size/GPU_BLOCK_SIZE, GPU_BLOCK_SIZE>>>
-                (
-                H, A_size, B_size, raw_A, raw_B, raw_lowerbounds, raw_A_param, raw_B_param, raw_prefix_sums
-        );
+                (H, get_ssp());
         gpuErrchk(cudaPeekAtLastError()); gpuErrchk(cudaDeviceSynchronize());
         int total_deposit_size = thrust::reduce(prefix_sums.begin(), prefix_sums.end());
         if(total_deposit_size > MAX_BATCH_SIZE) {
@@ -176,8 +180,7 @@ class SortedSums {
         fcl.time_tick();
         deposit<data_t, Aparam_t, Bparam_t, Condition>
                <<<1 + A_size/GPU_BLOCK_SIZE, GPU_BLOCK_SIZE>>>(
-            H, A_size, B_size, raw_A, raw_B, raw_lowerbounds, raw_A_param, raw_B_param, raw_prefix_sums, raw_items
-        );
+            H, get_ssp());
         gpuErrchk(cudaPeekAtLastError()); gpuErrchk(cudaDeviceSynchronize());
         fcl.time_tick();
         thrust::sort(items.begin(), items.begin() + total_deposit_size);
@@ -185,7 +188,8 @@ class SortedSums {
         fcl.time_tick();
         if(total_deposit_size > 1) {
             check_consecutive_eq<<<(total_deposit_size + GPU_BLOCK_SIZE - 1)/GPU_BLOCK_SIZE, GPU_BLOCK_SIZE>>>(
-                raw_eq_check, raw_items
+                thrust::raw_pointer_cast(eq_check.data()), 
+                thrust::raw_pointer_cast(items.data())
             );
         }
         gpuErrchk(cudaPeekAtLastError()); gpuErrchk(cudaDeviceSynchronize());
