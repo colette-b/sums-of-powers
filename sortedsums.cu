@@ -103,36 +103,32 @@ template<typename data_t, typename Aparam_t, typename Bparam_t, typename Conditi
 class SortedSums {
     int A_size, B_size;
     int MAX_BATCH_SIZE, MAX_EXPECTED_COLLISIONS;
-    thrust::device_vector<data_t> A, B;
+    thrust::device_vector<data_t> &A, &B;
     thrust::device_vector<data_t> items, lowerbound_args, collisions_collected;
-    thrust::device_vector<Aparam_t> A_param;
-    thrust::device_vector<Bparam_t> B_param;
+    thrust::device_vector<Aparam_t> &A_param;
+    thrust::device_vector<Bparam_t> &B_param;
     thrust::device_vector<int> prefix_sums, lowerbounds, eq_check;
 
     public:
     SortedSums(
-        int _MAX_BATCH_SIZE,
-        int _MAX_EXPECTED_COLLISIONS,
-        thrust::host_vector<data_t> hA, 
-        thrust::host_vector<data_t> hB,
-        thrust::host_vector<Aparam_t> hA_param,
-        thrust::host_vector<Bparam_t> hB_param
+        int MAX_BATCH_SIZE,
+        int MAX_EXPECTED_COLLISIONS,
+        thrust::device_vector<data_t> &A, 
+        thrust::device_vector<data_t> &B,
+        thrust::device_vector<Aparam_t> &A_param,
+        thrust::device_vector<Bparam_t> &B_param
     ) : 
-        MAX_BATCH_SIZE(_MAX_BATCH_SIZE),
-        MAX_EXPECTED_COLLISIONS(_MAX_EXPECTED_COLLISIONS),
-        A_size(hA.size()), B_size(hB.size()),
+        A(A), B(B), A_param(A_param), B_param(B_param),
+        MAX_BATCH_SIZE(MAX_BATCH_SIZE),
+        MAX_EXPECTED_COLLISIONS(MAX_EXPECTED_COLLISIONS),
+        A_size(A.size()), B_size(B.size()),
         prefix_sums(A_size),
         lowerbound_args(A_size),
         lowerbounds(A_size),
         items(MAX_BATCH_SIZE + 1),
         eq_check(MAX_BATCH_SIZE),
         collisions_collected(MAX_EXPECTED_COLLISIONS)
-    {
-        A = hA;
-        B = hB;
-        A_param = hA_param;
-        B_param = hB_param;
-    }
+    { }
 
     SortedSumsPointers<data_t, Aparam_t, Bparam_t> get_ssp() {
         SortedSumsPointers<data_t, Aparam_t, Bparam_t> ssp;

@@ -13,10 +13,13 @@ struct HiLoCondition {
 constexpr int N = 5000;
 constexpr int K = N * (N + 1) / 2;
 constexpr int E = 7;
-thrust::host_vector<data_t> h_sums2(K);
-thrust::host_vector<Pair> h_sums2_components(K);
+
+thrust::device_vector<data_t> sums2;
+thrust::device_vector<Pair> sums2_components;
 
 void initialize_sums2() {
+    thrust::host_vector<data_t> h_sums2(K);
+    thrust::host_vector<Pair> h_sums2_components(K);
     int ctr = 0;
     for(int i = 0; i < N; i++) {
         for(int j = i; j < N; j++) {
@@ -26,11 +29,11 @@ void initialize_sums2() {
         }
     }
     assert(ctr == K);
-    thrust::device_vector<data_t> s = h_sums2;
-    thrust::device_vector<Pair> p = h_sums2_components;
-    thrust::sort_by_key(s.begin(), s.end(), p.begin());
-    h_sums2 = s;
-    h_sums2_components = p;
+    sums2 = h_sums2;
+    sums2_components = h_sums2_components;
+    gpuErrchk(cudaPeekAtLastError()); gpuErrchk(cudaDeviceSynchronize());
+    thrust::sort_by_key(sums2.begin(), sums2.end(), sums2_components.begin());
+    gpuErrchk(cudaPeekAtLastError()); gpuErrchk(cudaDeviceSynchronize());
     std::cerr << "initialization done\n";
 }
 
@@ -39,13 +42,13 @@ int main() {
     SortedSums<data_t, Pair, Pair, HiLoCondition> ss(
         30 << 20,
         1 << 15,
-        h_sums2,
-        h_sums2,
-        h_sums2_components,
-        h_sums2_components
+        sums2,
+        sums2,
+        sums2_components,
+        sums2_components
     );
     SpecializedLogger fcl;
-    size_t final_size = ss.check_large_range(0, h_sums2[K - 1], fcl);
+    size_t final_size = ss.check_large_range(0, mypow(N, E), fcl);
     std::cerr << "Final size: " << final_size << std::endl;
     //restore<data_t, Pair, Pair, HiLoCondition>(h_sums2, h_sums2, h_sums2_components, h_sums2_components, 2056364173794800LL);
 }
