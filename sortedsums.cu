@@ -59,7 +59,8 @@ void deposit(data_t H, SortedSumsPointers<data_t, Aparam_t, Bparam_t> ssp) {
     if(i >= ssp.A_size)
         return;
     int count = ssp.prefix_sums[i];
-    for(int j = ssp.lowerbounds[i]; j < ssp.B_size and ssp.A[i] + ssp.B[j] < H; j++) {
+    int finish = ssp.prefix_sums[i + 1];
+    for(int j = ssp.lowerbounds[i]; count < finish; j++) {
         if(Condition::condition(ssp.A_param[i], ssp.B_param[j])) {
             ssp.items[count] = ssp.A[i] + ssp.B[j];
             count++;
@@ -122,7 +123,7 @@ class SortedSums {
         MAX_BATCH_SIZE(MAX_BATCH_SIZE),
         MAX_EXPECTED_COLLISIONS(MAX_EXPECTED_COLLISIONS),
         A_size(A.size()), B_size(B.size()),
-        prefix_sums(A_size),
+        prefix_sums(A_size + 1),
         lowerbound_args(A_size),
         lowerbounds(A_size),
         items(MAX_BATCH_SIZE + 1),
@@ -160,7 +161,7 @@ class SortedSums {
                 <<<1 + A_size/GPU_BLOCK_SIZE, GPU_BLOCK_SIZE>>>
                 (H, get_ssp());
         gpuErrchk(cudaPeekAtLastError()); gpuErrchk(cudaDeviceSynchronize());
-        int total_deposit_size = thrust::reduce(prefix_sums.begin(), prefix_sums.end());
+        int total_deposit_size = thrust::reduce(prefix_sums.begin(), prefix_sums.end() - 1);
         if(total_deposit_size > MAX_BATCH_SIZE) {
             fcl.cleanup();
             throw range_too_large_error();
@@ -216,7 +217,7 @@ class SortedSums {
             try {
                 data_t current_H = std::min(current_L + jump, H);
                 int batch_size = check_range(current_L, current_H, fcl);
-                if(iter % 100 == 99) {
+                if(iter % 10 == 9) {
                     std::cerr << "[" << current_L << ", " << current_H << ")\t";
                     fcl.show();
                 }
