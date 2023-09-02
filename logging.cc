@@ -85,8 +85,6 @@ struct SpecializedLogger : FunctionCallLogger<9, false, int> {
     long long total_seen = 0;
 
     void show() override {
-        if(timings.size() % 100)
-            return;
         FunctionCallLogger::_show("");
         duration total = std::accumulate(timings[last()].begin(), timings[last()].end(), duration(0));
         std::cerr << "\tspeed=" << std::get<0>(outs[last()]) / std::chrono::duration_cast<std::chrono::duration<double, std::milli>>(total).count() / 1000 << "M/s\n";
