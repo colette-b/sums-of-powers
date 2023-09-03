@@ -40,7 +40,7 @@ void initialize_sums2() {
 int main() {
     initialize_sums2();
     SortedSums<data_t, Pair, Pair, HiLoCondition> ss(
-        30 << 20,
+        50 << 20,
         1 << 15,
         sums2,
         sums2,
@@ -48,7 +48,7 @@ int main() {
         sums2_components
     );
     SpecializedLogger fcl;
-    size_t final_size = ss.check_large_range(0, mypow(N, E), fcl);
+    size_t final_size = ss.check_large_range(mypow(N, E) * 0.593129, mypow(N, E), fcl);
     std::cerr << "Final size: " << final_size << std::endl;
     //restore<data_t, Pair, Pair, HiLoCondition>(h_sums2, h_sums2, h_sums2_components, h_sums2_components, 2056364173794800LL);
 }
