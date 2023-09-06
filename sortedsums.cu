@@ -1,5 +1,6 @@
 #include <random>
 #include <limits>
+#include <type_traits>
 
 #include <thrust/host_vector.h>
 #include <thrust/device_vector.h>
@@ -54,6 +55,18 @@ void precount(data_t H, SortedSumsPointers<data_t, Aparam_t, Bparam_t> ssp) {
     ssp.prefix_sums[i] = count;
 }
 
+__device__
+unsigned long long quickhash(__int128_t x) {
+    __int128_t a = 14961028834985323270ULL;
+    __int128_t b = 5197404312475394493ULL;
+    __int128_t c = 8213834590087469565ULL;
+    a *= 93721731;
+    b *= 9832971329632LL;
+    c *= 19000088;
+    __int128_t low = x&((__int128_t(1)<<64) - 1), high = x>>64;
+    return (a * low + b * high + c) >> 64;
+}
+
 template<typename item_t, typename data_t, typename Aparam_t, typename Bparam_t, typename Condition>
 __global__
 void deposit(data_t H, SortedSumsPointers<data_t, Aparam_t, Bparam_t> ssp) {
@@ -65,7 +78,12 @@ void deposit(data_t H, SortedSumsPointers<data_t, Aparam_t, Bparam_t> ssp) {
     item_t *ptr = reinterpret_cast<item_t*>(ssp.items);
     for(int j = ssp.lowerbounds[i]; count < finish; j++) {
         if(Condition::condition(ssp.A_param[i], ssp.B_param[j])) {
-            ptr[count] = ssp.A[i] + ssp.B[j];
+            if constexpr(std::is_same<item_t, unsigned long long>::value) {
+                ptr[count] = quickhash(ssp.A[i] + ssp.B[j]);
+            }
+            if constexpr(std::is_same<item_t, data_t>::value) {
+                ptr[count] = ssp.A[i] + ssp.B[j];
+            }
             count++;
         }
     }
@@ -203,29 +221,13 @@ class SortedSums {
             return total_deposit_size;
         }
         gpuErrchk(cudaPeekAtLastError()); gpuErrchk(cudaDeviceSynchronize());
-        
-/*      fcl.time_tick();
-        deposit<data_t, data_t, Aparam_t, Bparam_t, Condition>
-               <<<1 + A_size/GPU_BLOCK_SIZE, GPU_BLOCK_SIZE>>>(
-            H, get_ssp());
-        gpuErrchk(cudaPeekAtLastError()); gpuErrchk(cudaDeviceSynchronize());
-        fcl.time_tick();
-        thrust::sort(items.begin(), items.begin() + total_deposit_size);
-        gpuErrchk(cudaPeekAtLastError()); gpuErrchk(cudaDeviceSynchronize());
-        fcl.time_tick();
-        check_consecutive_eq<<<(total_deposit_size + GPU_BLOCK_SIZE - 1)/GPU_BLOCK_SIZE, GPU_BLOCK_SIZE>>>(
-            thrust::raw_pointer_cast(eq_check.data()), 
-            thrust::raw_pointer_cast(items.data())
-        );
-        gpuErrchk(cudaPeekAtLastError()); gpuErrchk(cudaDeviceSynchronize());
-        int collision_happened = thrust::reduce(eq_check.begin(), eq_check.begin() + total_deposit_size - 1);
-*/
-        //int collision_happened = check_collisions<unsigned long long, true>(L, H, total_deposit_size, fcl);
-        //if(collision_happened) {
-        //    std::cerr << "seen " << collision_happened << " quick collisions\n";
-        //    check_collisions<data_t, false>(L, H, total_deposit_size, fcl);
-        //}
-        int collision_happened = check_collisions<data_t, true>(L, H, total_deposit_size, fcl);
+
+        int collision_happened = check_collisions<unsigned long long, true>(L, H, total_deposit_size, fcl);
+        if(collision_happened) {
+            std::cerr << "seen " << collision_happened << " quick collisions\n";
+            collision_happened = check_collisions<data_t, false>(L, H, total_deposit_size, fcl);
+        }
+        //int collision_happened = check_collisions<data_t, true>(L, H, total_deposit_size, fcl);
 
         fcl.time_tick();
         gpuErrchk(cudaPeekAtLastError()); gpuErrchk(cudaDeviceSynchronize());
