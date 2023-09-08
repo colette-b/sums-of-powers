@@ -2,6 +2,7 @@
 !.gitignore
 !sums.cu
 !basic.cu
+!basic_test.cu
 !main.cu
 !logging.cc
 !sortedsums.cu
