@@ -7,4 +7,4 @@
 !sortedsums.cu
 !main_422.cu
 !main_n44.cu
-!Makefile
+!CMakeLists.txt
