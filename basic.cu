@@ -52,3 +52,17 @@ std::ostream& operator<<(std::ostream& os, __int128_t x) {
     os << decimal;
     return os;
 }
+
+std::istream& operator>>(std::istream& is, __int128_t& x) {
+    std::string s;
+    is >> s;
+    x = 0;
+    for(int i = (s[0] == '-' ? 1 : 0); i < s.length(); i++) {
+        x *= 10;
+        x += (s[i] - '0');
+    }
+    if(s[0] == '-') {
+        x *= -1;
+    }
+    return is;
+}
