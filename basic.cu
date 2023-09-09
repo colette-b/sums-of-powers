@@ -30,27 +30,22 @@ struct Pair {
 };
 
 std::ostream& operator<<(std::ostream& os, const Pair& p) {
-    os << "(" << p.lo << ", " << p.hi << ")";
-    return os;
+    return os << "(" << p.lo << ", " << p.hi << ")";
 }
 
 std::ostream& operator<<(std::ostream& os, __int128_t x) {
 	if(x == 0) {
-        os << "0";
-		return os;
+        return os << "0";
     }
     if(x < 0) {
-        os << "-";
-        os << -x;
-        return os;
+        return os << "-" << -x;
     }
     std::string decimal;
     while(x > 0) {
         decimal = char(x%10 + '0') + decimal;
         x /= 10;
     }
-    os << decimal;
-    return os;
+    return os << decimal;
 }
 
 std::istream& operator>>(std::istream& is, __int128_t& x) {
