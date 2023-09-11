@@ -1,4 +1,6 @@
-#include<iostream>
+#include <iostream>
+#include <fmt/core.h>
+#define FMT_HEADER_ONLY
 
 constexpr int GPU_BLOCK_SIZE = 256;
 
@@ -34,18 +36,7 @@ std::ostream& operator<<(std::ostream& os, const Pair& p) {
 }
 
 std::ostream& operator<<(std::ostream& os, __int128_t x) {
-	if(x == 0) {
-        return os << "0";
-    }
-    if(x < 0) {
-        return os << "-" << -x;
-    }
-    std::string decimal;
-    while(x > 0) {
-        decimal = char(x%10 + '0') + decimal;
-        x /= 10;
-    }
-    return os << decimal;
+    return os << fmt::format("{}", x);
 }
 
 std::istream& operator>>(std::istream& is, __int128_t& x) {
