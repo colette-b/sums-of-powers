@@ -39,10 +39,8 @@ std::ostream& operator<<(std::ostream& os, __int128_t x) {
     return os << fmt::format("{}", x);
 }
 
-std::istream& operator>>(std::istream& is, __int128_t& x) {
-    std::string s;
-    is >> s;
-    x = 0;
+__int128_t parse_int128_from_string(const std::string& s) {
+    __int128_t x = 0;
     for(int i = (s[0] == '-' ? 1 : 0); i < s.length(); i++) {
         x *= 10;
         x += (s[i] - '0');
@@ -50,5 +48,12 @@ std::istream& operator>>(std::istream& is, __int128_t& x) {
     if(s[0] == '-') {
         x *= -1;
     }
+    return x;
+}
+
+std::istream& operator>>(std::istream& is, __int128_t& x) {
+    std::string s;
+    is >> s;
+    x = parse_int128_from_string(s);
     return is;
 }
