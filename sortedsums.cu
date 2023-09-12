@@ -57,14 +57,17 @@ void precount(data_t H, SortedSumsPointers<data_t, Aparam_t, Bparam_t> ssp) {
 
 __device__
 unsigned long long quickhash(__int128_t x) {
-    __int128_t a = 14961028834985323270ULL;
-    __int128_t b = 5197404312475394493ULL;
-    __int128_t c = 8213834590087469565ULL;
-    a *= 93721731;
-    b *= 9832971329632LL;
-    c *= 19000088;
-    __int128_t low = x&((__int128_t(1)<<64) - 1), high = x>>64;
-    return (a * low + b * high + c) >> 64;
+    unsigned long long arr[6] = {
+        8497707237685197884ULL,
+        4712945162569964047ULL,
+        1811193290306197184ULL,
+        1346773749745882465ULL,
+        1657195945765243368ULL,
+        1454561834835265983ULL
+    };
+    __int128_t *coefs = reinterpret_cast<__int128_t*>(arr);
+    __int128_t xlow = x&((__int128_t(1)<<64) - 1), xhigh = x>>64;
+    return (coefs[0] * xlow + coefs[1] * xhigh + coefs[2]) >> 64;
 }
 
 template<typename item_t, typename data_t, typename Aparam_t, typename Bparam_t, typename Condition>
