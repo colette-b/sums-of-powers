@@ -1,6 +1,7 @@
 #include <random>
 #include <limits>
 #include <type_traits>
+#include <functional>
 
 #include <thrust/host_vector.h>
 #include <thrust/device_vector.h>
@@ -74,8 +75,8 @@ template<typename data_t>
 struct DepositHashed {
     using deposit_t = unsigned long long;
     __device__
-    static deposit_t deposit_value(data_t x, data_t y) {
-        return quickhash(x + y);
+    static void deposit_value(deposit_t& item, data_t x, data_t y) {
+        item = quickhash(x + y);
     }
 };
 
@@ -83,8 +84,8 @@ template<typename data_t>
 struct DepositUnhashed {
     using deposit_t = data_t;
     __device__
-    static deposit_t deposit_value(data_t x, data_t y) {
-        return x + y;
+    static void deposit_value(deposit_t& item, data_t x, data_t y) {
+        item = x + y;
     }
 };
 
@@ -92,14 +93,15 @@ template<typename data_t>
 struct DepositBothSummands {
     using deposit_t = std::pair<data_t, data_t>;
     __device__
-    static deposit_t deposit_value(data_t x, data_t y) {
-        return std::make_pair(x, y);
+    static void deposit_value(deposit_t& item, data_t x, data_t y) {
+        item.first = x;
+        item.second = y;
     }
 };
 
 template<typename Deposit, typename data_t, typename Aparam_t, typename Bparam_t, typename Condition>
 __global__
-void deposit(data_t H, SortedSumsPointers<data_t, Aparam_t, Bparam_t> ssp) {
+void deposit(SortedSumsPointers<data_t, Aparam_t, Bparam_t> ssp) {
     int i = blockIdx.x*blockDim.x + threadIdx.x;
     if(i >= ssp.A_size)
         return;
@@ -108,7 +110,7 @@ void deposit(data_t H, SortedSumsPointers<data_t, Aparam_t, Bparam_t> ssp) {
     typename Deposit::deposit_t *ptr = reinterpret_cast<Deposit::deposit_t*>(ssp.items);
     for(int j = ssp.lowerbounds[i]; count < finish; j++) {
         if(Condition::condition(ssp.A_param[i], ssp.B_param[j])) {
-            ptr[count] = Deposit::deposit_value(ssp.A[i], ssp.B[j]);
+            Deposit::deposit_value(ptr[count], ssp.A[i], ssp.B[j]);
             count++;
         }
     }
@@ -218,7 +220,7 @@ class SortedSums {
         if(tick)
             fcl.time_tick();
         deposit<Deposit, data_t, Aparam_t, Bparam_t, Condition>
-               <<<1 + A_size/GPU_BLOCK_SIZE, GPU_BLOCK_SIZE>>>(H, get_ssp());
+               <<<1 + A_size/GPU_BLOCK_SIZE, GPU_BLOCK_SIZE>>>(get_ssp());
         gpuErrchk(cudaPeekAtLastError()); gpuErrchk(cudaDeviceSynchronize());
         if(tick)
             fcl.time_tick();
@@ -239,8 +241,8 @@ class SortedSums {
     std::vector<std::pair<data_t, data_t>> restore_collision(data_t P) {
         SpecializedLogger dummy;
         int total_deposit_size = make_prefix_sums(P, P + 1, dummy);
-        deposit<DepositBothSummands, data_t, Aparam_t, Bparam_t, Condition>
-               <<<1 + A_size/GPU_BLOCK_SIZE, GPU_BLOCK_SIZE>>>(P + 1, get_ssp());
+        deposit<DepositBothSummands<data_t>, data_t, Aparam_t, Bparam_t, Condition>
+               <<<1 + A_size/GPU_BLOCK_SIZE, GPU_BLOCK_SIZE>>>(get_ssp());
         std::vector<std::pair<data_t, data_t>> vec(total_deposit_size);
         cudaMemcpy(
             vec.data(), 
@@ -251,7 +253,7 @@ class SortedSums {
         return vec;
     }
 
-    int check_range(data_t L, data_t H, SpecializedLogger& fcl, std::vector<data_t>& collisions_append_vector) {
+    int check_range(data_t L, data_t H, SpecializedLogger& fcl, std::function<void(data_t)> do_on_collision) {
         int total_deposit_size = make_prefix_sums(L, H, fcl);
         if(total_deposit_size > MAX_BATCH_SIZE) {
             fcl.cleanup();
@@ -263,16 +265,16 @@ class SortedSums {
         }
         gpuErrchk(cudaPeekAtLastError()); gpuErrchk(cudaDeviceSynchronize());
 
-        int collision_happened = check_collisions<DepositHashed<data_t>, true>(L, H, total_deposit_size, fcl);
-        if(collision_happened) {
-            std::cerr << "seen " << collision_happened << " quick collisions\n";
-            collision_happened = check_collisions<DepositUnhashed<data_t>, false>(L, H, total_deposit_size, fcl);
+        int collision_count = check_collisions<DepositHashed<data_t>, true>(L, H, total_deposit_size, fcl);
+        if(collision_count) {
+            std::cerr << "seen " << collision_count << " quick collisions\n";
+            collision_count = check_collisions<DepositUnhashed<data_t>, false>(L, H, total_deposit_size, fcl);
         }
 
         fcl.time_tick();
         gpuErrchk(cudaPeekAtLastError()); gpuErrchk(cudaDeviceSynchronize());
-        thrust::host_vector<data_t> collisions(0);
-        if(collision_happened > 0) {
+        thrust::host_vector<data_t> h_collisions_collected(0);
+        if(collision_count > 0) {
             thrust::copy_if(
                 items.begin(), 
                 items.begin() + total_deposit_size - 1, 
@@ -280,27 +282,25 @@ class SortedSums {
                 collisions_collected.begin(), 
                 thrust::identity<bool>()
             );
-            collisions = collisions_collected;
+            h_collisions_collected = collisions_collected;
+            for(int i = 0; i < collision_count; i++) {
+                do_on_collision(h_collisions_collected[i]);
+            }
         }
         fcl.time_tick();
         fcl.set<0>(total_deposit_size);
-        if(collision_happened) {
-            for(int i = 0; i < collision_happened; i++) {
-                std::cout << collisions[i] << "\n";
-            }
-        }
         gpuErrchk(cudaPeekAtLastError()); gpuErrchk(cudaDeviceSynchronize());
         return total_deposit_size;
     }
 
     template<typename Logger>
-    size_t check_large_range(data_t L, data_t H, Logger& fcl) {
+    size_t check_large_range(data_t L, data_t H, Logger& fcl, std::function<void(data_t)> do_on_collision) {
         data_t current_L = L, jump = 1 << 20;
         size_t total = 0;
         for(int iter = 0; current_L < H; iter++){
             try {
                 data_t current_H = std::min(current_L + jump, H);
-                int batch_size = check_range(current_L, current_H, fcl);
+                int batch_size = check_range(current_L, current_H, fcl, do_on_collision);
                 if(iter % 10 == 9) {
                     std::cerr << "[" << current_L << ", " << current_H << ")\t";
                     fcl.show();
