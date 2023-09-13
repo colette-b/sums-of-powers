@@ -70,7 +70,25 @@ unsigned long long quickhash(__int128_t x) {
     return (coefs[0] * xlow + coefs[1] * xhigh + coefs[2]) >> 64;
 }
 
-template<typename item_t, typename data_t, typename Aparam_t, typename Bparam_t, typename Condition>
+template<typename data_t>
+struct DepositHashed {
+    using deposit_t = unsigned long long;
+    __device__
+    static deposit_t deposit_value(data_t x, data_t y) {
+        return quickhash(x + y);
+    }
+};
+
+template<typename data_t>
+struct DepositUnhashed {
+    using deposit_t = data_t;
+    __device__
+    static deposit_t deposit_value(data_t x, data_t y) {
+        return x + y;
+    }
+};
+
+template<typename Deposit, typename data_t, typename Aparam_t, typename Bparam_t, typename Condition>
 __global__
 void deposit(data_t H, SortedSumsPointers<data_t, Aparam_t, Bparam_t> ssp) {
     int i = blockIdx.x*blockDim.x + threadIdx.x;
@@ -78,15 +96,10 @@ void deposit(data_t H, SortedSumsPointers<data_t, Aparam_t, Bparam_t> ssp) {
         return;
     int count = ssp.prefix_sums[i];
     int finish = ssp.prefix_sums[i + 1];
-    item_t *ptr = reinterpret_cast<item_t*>(ssp.items);
+    typename Deposit::deposit_t *ptr = reinterpret_cast<Deposit::deposit_t*>(ssp.items);
     for(int j = ssp.lowerbounds[i]; count < finish; j++) {
         if(Condition::condition(ssp.A_param[i], ssp.B_param[j])) {
-            if constexpr(std::is_same<item_t, unsigned long long>::value) {
-                ptr[count] = quickhash(ssp.A[i] + ssp.B[j]);
-            }
-            if constexpr(std::is_same<item_t, data_t>::value) {
-                ptr[count] = ssp.A[i] + ssp.B[j];
-            }
+            ptr[count] = Deposit::deposit_value(ssp.A[i], ssp.B[j]);
             count++;
         }
     }
@@ -191,16 +204,17 @@ class SortedSums {
         return total_deposit_size;
     }
     
-    template<typename item_t, bool tick>
+    template<typename Deposit, bool tick>
     int check_collisions(data_t L, data_t H, int total_deposit_size, SpecializedLogger& fcl) {
         if(tick)
             fcl.time_tick();
-        deposit<item_t, data_t, Aparam_t, Bparam_t, Condition>
+        deposit<Deposit, data_t, Aparam_t, Bparam_t, Condition>
                <<<1 + A_size/GPU_BLOCK_SIZE, GPU_BLOCK_SIZE>>>(H, get_ssp());
         gpuErrchk(cudaPeekAtLastError()); gpuErrchk(cudaDeviceSynchronize());
         if(tick)
             fcl.time_tick();
-        item_t *items_ptr = reinterpret_cast<item_t*>(thrust::raw_pointer_cast(items.data()));
+        typename Deposit::deposit_t *items_ptr = 
+            reinterpret_cast<Deposit::deposit_t*>(thrust::raw_pointer_cast(items.data()));
         thrust::sort(thrust::device, items_ptr, items_ptr + total_deposit_size);
         gpuErrchk(cudaPeekAtLastError()); gpuErrchk(cudaDeviceSynchronize());
         if(tick)
@@ -225,12 +239,11 @@ class SortedSums {
         }
         gpuErrchk(cudaPeekAtLastError()); gpuErrchk(cudaDeviceSynchronize());
 
-        int collision_happened = check_collisions<unsigned long long, true>(L, H, total_deposit_size, fcl);
+        int collision_happened = check_collisions<DepositHashed<data_t>, true>(L, H, total_deposit_size, fcl);
         if(collision_happened) {
             std::cerr << "seen " << collision_happened << " quick collisions\n";
-            collision_happened = check_collisions<data_t, false>(L, H, total_deposit_size, fcl);
+            collision_happened = check_collisions<DepositUnhashed<data_t>, false>(L, H, total_deposit_size, fcl);
         }
-        //int collision_happened = check_collisions<data_t, true>(L, H, total_deposit_size, fcl);
 
         fcl.time_tick();
         gpuErrchk(cudaPeekAtLastError()); gpuErrchk(cudaDeviceSynchronize());
