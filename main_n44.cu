@@ -59,7 +59,13 @@ void print_collision(data_t P, SortedSums<data_t, Pair, Pair, HiLoCondition>& ss
     }
 }
 
-int main() {
+int main(int argc, char **argv) {
+    __int128_t starting_point = 0;
+    if(argc == 2) {
+        starting_point = parse_int128_from_string(std::string(argv[1]));
+    }
+    std::cerr << "starting from " << starting_point << "...\n";
+
     initialize_sums2();
     SortedSums<data_t, Pair, Pair, HiLoCondition> ss(
         50 << 20,
@@ -71,7 +77,7 @@ int main() {
     );
     SpecializedLogger fcl;
     size_t final_size = ss.check_large_range(
-        mypow(N, E) * 0, 
+        starting_point, 
         mypow(N, E), 
         fcl,
         [&ss](data_t P) {print_collision(P, ss);}
