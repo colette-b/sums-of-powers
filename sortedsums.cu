@@ -88,6 +88,15 @@ struct DepositUnhashed {
     }
 };
 
+template<typename data_t>
+struct DepositBothSummands {
+    using deposit_t = std::pair<data_t, data_t>;
+    __device__
+    static deposit_t deposit_value(data_t x, data_t y) {
+        return std::make_pair(x, y);
+    }
+};
+
 template<typename Deposit, typename data_t, typename Aparam_t, typename Bparam_t, typename Condition>
 __global__
 void deposit(data_t H, SortedSumsPointers<data_t, Aparam_t, Bparam_t> ssp) {
@@ -227,7 +236,22 @@ class SortedSums {
         return collision_count;
     }
 
-    int check_range(data_t L, data_t H, SpecializedLogger& fcl) {
+    std::vector<std::pair<data_t, data_t>> restore_collision(data_t P) {
+        SpecializedLogger dummy;
+        int total_deposit_size = make_prefix_sums(P, P + 1, dummy);
+        deposit<DepositBothSummands, data_t, Aparam_t, Bparam_t, Condition>
+               <<<1 + A_size/GPU_BLOCK_SIZE, GPU_BLOCK_SIZE>>>(P + 1, get_ssp());
+        std::vector<std::pair<data_t, data_t>> vec(total_deposit_size);
+        cudaMemcpy(
+            vec.data(), 
+            get_ssp().items, 
+            sizeof(std::pair<data_t, data_t>) * total_deposit_size,
+            cudaMemcpyDeviceToHost
+        );
+        return vec;
+    }
+
+    int check_range(data_t L, data_t H, SpecializedLogger& fcl, std::vector<data_t>& collisions_append_vector) {
         int total_deposit_size = make_prefix_sums(L, H, fcl);
         if(total_deposit_size > MAX_BATCH_SIZE) {
             fcl.cleanup();
