@@ -267,8 +267,11 @@ class SortedSums {
 
         int collision_count = check_collisions<DepositHashed<data_t>, true>(L, H, total_deposit_size, fcl);
         if(collision_count) {
-            std::cerr << "seen " << collision_count << " quick collisions\n";
-            collision_count = check_collisions<DepositUnhashed<data_t>, false>(L, H, total_deposit_size, fcl);
+            int collision_count_full = check_collisions<DepositUnhashed<data_t>, false>(L, H, total_deposit_size, fcl);
+            if(collision_count_full < collision_count) {
+                fmt::print("Found {} quick collisions but only {} proper ones", collision_count, collision_count_full);
+                collision_count = collision_count_full;
+            }
         }
 
         fcl.time_tick();
@@ -301,7 +304,7 @@ class SortedSums {
             try {
                 data_t current_H = std::min(current_L + jump, H);
                 int batch_size = check_range(current_L, current_H, fcl, do_on_collision);
-                if(iter % 10 == 9) {
+                if(iter % 1000 == 999) {
                     std::cerr << "[" << current_L << ", " << current_H << ")\t";
                     fcl.show();
                 }
