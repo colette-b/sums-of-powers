@@ -53,9 +53,9 @@ void print_collision(data_t P, SortedSums<data_t, Pair, Pair, HiLoCondition>& ss
         gcd = std::gcd(gcd, summands[3]);
     }
     if(gcd == 1) {
-        std::cout << "\t(primitive)\n";
+        std::cout << "\t(primitive)" << std::endl;
     } else {
-        std::cout << "\tnot primitive, gcd=" << gcd << "\n";
+        std::cout << "\tnot primitive, gcd=" << gcd << std::endl;
     }
 }
 
@@ -75,8 +75,6 @@ int main() {
         mypow(N, E), 
         fcl,
         [&ss](data_t P) {print_collision(P, ss);}
-        //[](data_t P) {std::cerr << "collision at " << P << "\n";}
     );
     std::cerr << "Final size: " << final_size << std::endl;
-    //restore<data_t, Pair, Pair, HiLoCondition>(h_sums2, h_sums2, h_sums2_components, h_sums2_components, 2056364173794800LL);
 }
