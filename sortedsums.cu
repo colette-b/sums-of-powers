@@ -269,7 +269,7 @@ class SortedSums {
         if(collision_count) {
             int collision_count_full = check_collisions<DepositUnhashed<data_t>, false>(L, H, total_deposit_size, fcl);
             if(collision_count_full < collision_count) {
-                fmt::print("Found {} quick collisions but only {} proper ones", collision_count, collision_count_full);
+                fmt::print("Found {} quick collisions but only {} proper ones\n", collision_count, collision_count_full);
                 collision_count = collision_count_full;
             }
         }
