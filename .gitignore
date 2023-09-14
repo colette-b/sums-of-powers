@@ -11,3 +11,4 @@
 !CMakeLists.txt
 !txtfiles
 !txtfiles/ALL744.txt
+!fmt-fix-nvcc-and-int128.patch

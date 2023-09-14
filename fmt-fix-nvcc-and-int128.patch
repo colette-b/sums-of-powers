@@ -1,0 +1,13 @@
+diff --git a/include/fmt/core.h b/include/fmt/core.h
+index 1fe13888..d500370e 100644
+--- a/include/fmt/core.h
++++ b/include/fmt/core.h
+@@ -351,7 +351,7 @@ template <typename T> struct std_string_view {};
+ 
+ #ifdef FMT_USE_INT128
+ // Do nothing.
+-#elif defined(__SIZEOF_INT128__) && !defined(__NVCC__) && \
++#elif defined(__SIZEOF_INT128__) && \
+     !(FMT_CLANG_VERSION && FMT_MSC_VERSION)
+ #  define FMT_USE_INT128 1
+ using int128_opt = __int128_t;  // An optional native 128-bit integer.
